@@ -180,6 +180,29 @@
         min-height: 0;
       }
 
+      /* ── Scrollbars ──────────────────────────────────── */
+      .rw-list,
+      .rune-panel {
+        scrollbar-color: var(--gold-dim) var(--surface2);
+      }
+      .rw-list::-webkit-scrollbar,
+      .rune-panel::-webkit-scrollbar {
+        width: 6px;
+      }
+      .rw-list::-webkit-scrollbar-track,
+      .rune-panel::-webkit-scrollbar-track {
+        background: var(--surface2);
+      }
+      .rw-list::-webkit-scrollbar-thumb,
+      .rune-panel::-webkit-scrollbar-thumb {
+        background: var(--gold-dim);
+        border-radius: 999px;
+      }
+      .rw-list::-webkit-scrollbar-thumb:hover,
+      .rune-panel::-webkit-scrollbar-thumb:hover {
+        background: var(--gold);
+      }
+
       /* ── Runeword list ───────────────────────────────── */
       .rw-list {
         overflow-y: auto;
