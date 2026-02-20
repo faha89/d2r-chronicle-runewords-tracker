@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>D2R Runeword Tracker</title>
+  <style>
+    /* ── Reset & base ────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0e0d0b;
+      --surface:   #1a1814;
+      --surface2:  #242118;
+      --border:    #3a3428;
+      --gold:      #c8a84b;
+      --gold-dim:  #7a6428;
+      --text:      #d4c9a8;
+      --text-dim:  #5a5040;
+      --red:       #8b2020;
+      --green:     #2a5c2a;
+      --done:      #1e3a1e;
+      --radius:    6px;
+
+      /* rune tier colors */
+      --rune-low:  #5a7a3a;
+      --rune-mid:  #7a5a1a;
+      --rune-high: #7a2a20;
+    }
+
+    html { font-size: 14px; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ──────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 2px solid var(--gold-dim);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    header h1 {
+      font-size: 1.3rem;
+      color: var(--gold);
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .progress-wrap {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .progress-label {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+
+    .progress-bar-bg {
+      height: 10px;
+      background: var(--surface2);
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+      border-radius: 999px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    button {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 5px 12px;
+      font-size: 0.8rem;
+      background: var(--surface2);
+      color: var(--text);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button:hover { background: var(--border); border-color: var(--gold-dim); }
+    button.danger { border-color: var(--red); color: #e07070; }
+    button.danger:hover { background: #2a1010; }
+
+    /* ── Filter bar ──────────────────────────────────── */
+    .filter-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 20px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .filter-bar span { font-size: 0.75rem; color: var(--text-dim); margin-right: 4px; }
+
+    .filter-btn {
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+    .filter-btn.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold); }
+
+    .search-input {
+      margin-left: auto;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      width: 160px;
+    }
+    .search-input::placeholder { color: var(--text-dim); }
+    .search-input:focus { outline: none; border-color: var(--gold-dim); }
+
+    /* ── Main layout ─────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 220px;
+      gap: 0;
+      height: calc(100vh - 93px); /* header + filter */
+      align-items: start;
+    }
+
+    /* ── Runeword list ───────────────────────────────── */
+    .rw-list {
+      overflow-y: auto;
+      height: 100%;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .rw-item {
+      display: grid;
+      grid-template-columns: 24px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      transition: background 0.15s, border-color 0.15s, opacity 0.2s;
+      cursor: pointer;
+      user-select: none;
+    }
+    .rw-item:hover { border-color: var(--gold-dim); background: var(--surface2); }
+    .rw-item.done {
+      background: var(--done);
+      border-color: #2a4a2a;
+      opacity: 0.6;
+    }
+    .rw-item.done .rw-name { text-decoration: line-through; color: var(--text-dim); }
+    .rw-item.hidden { display: none; }
+
+    .rw-check {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--gold);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .rw-info { display: flex; flex-direction: column; gap: 3px; }
+
+    .rw-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .rw-recipe { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+
+    .rune-chip {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 999px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .rune-chip.low  { background: #1e2e10; color: #8aba50; border: 1px solid #3a5a20; }
+    .rune-chip.mid  { background: #2a1e08; color: #c8882a; border: 1px solid #5a3a10; }
+    .rune-chip.high { background: #2a0e0e; color: #e05050; border: 1px solid #5a2020; }
+
+    .plus-sep { color: var(--text-dim); font-size: 0.7rem; }
+
+    .rw-tags { display: flex; gap: 4px; flex-direction: column; align-items: flex-end; }
+
+    .tag {
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 3px;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    .tag.ldr  { background: #1a1a3a; color: #7878d8; border: 1px solid #3a3a6a; }
+    .tag.rotw { background: #2a1a00; color: #d88820; border: 1px solid #6a4000; }
+
+    /* ── Rune panel ──────────────────────────────────── */
+    .rune-panel {
+      overflow-y: auto;
+      height: 100%;
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      padding: 12px;
+    }
+
+    .rune-panel h2 {
+      font-size: 0.8rem;
+      color: var(--gold);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .rune-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .rune-table td {
+      padding: 3px 4px;
+      font-size: 0.8rem;
+      vertical-align: middle;
+    }
+
+    .rune-table tr.zero { opacity: 0.3; }
+    .rune-table tr.zero .rune-name { text-decoration: line-through; }
+
+    .rune-name { font-weight: 700; width: 50px; }
+    .rune-name.low  { color: #8aba50; }
+    .rune-name.mid  { color: #c8882a; }
+    .rune-name.high { color: #e05050; }
+
+    .rune-count {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      color: var(--gold);
+      width: 24px;
+    }
+    .rune-table tr.zero .rune-count { color: var(--text-dim); }
+
+    .rune-bar-cell { width: 100%; padding-left: 6px; }
+    .rune-bar-bg {
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .rune-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+    .rune-bar-fill.low  { background: #8aba50; }
+    .rune-bar-fill.mid  { background: #c8882a; }
+    .rune-bar-fill.high { background: #e05050; }
+
+    .rune-sep {
+      height: 6px;
+    }
+
+    /* ── Responsive ──────────────────────────────────── */
+    @media (max-width: 600px) {
+      .layout {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+      .rune-panel {
+        border-left: none;
+        border-top: 1px solid var(--border);
+        height: auto;
+        max-height: 340px;
+      }
+      .rw-list { height: auto; max-height: 60vh; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>D2R Runeword Tracker</h1>
+  <div class="progress-wrap">
+    <div class="progress-label" id="progressLabel">0 / 98 completed</div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="danger" onclick="resetAll()">Reset Progress</button>
+  </div>
+</header>
+
+<div class="filter-bar">
+  <span>Show:</span>
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="todo">Remaining</button>
+  <button class="filter-btn" data-filter="done">Completed</button>
+  <button class="filter-btn" data-filter="ldr">LDR only</button>
+  <button class="filter-btn" data-filter="rotw">RotW only</button>
+  <input class="search-input" type="search" id="searchInput" placeholder="Search runeword..." />
+</div>
+
+<div class="layout">
+  <div class="rw-list" id="rwList"></div>
+  <div class="rune-panel">
+    <h2>Runes Still Needed</h2>
+    <table class="rune-table" id="runeTable"></table>
+  </div>
+</div>
+
+<script>
+// ── Data ─────────────────────────────────────────────────────────────────────
+
+const RUNE_ORDER = [
+  'El','Eld','Tir','Nef','Eth','Ith','Tal','Ral','Ort','Thul',
+  'Amn','Sol','Shael','Dol','Hel','Io','Lum','Ko','Fal','Lem',
+  'Pul','Um','Mal','Ist','Gul','Vex','Ohm','Lo','Sur','Ber',
+  'Jah','Cham','Zod'
+];
+
+// Tier breakpoints (index in RUNE_ORDER, 0-based)
+// El(0)–Thul(9) = low, Amn(10)–Lem(19) = mid, Pul(20)–Zod(32) = high
+function runeTier(rune) {
+  const i = RUNE_ORDER.indexOf(rune);
+  if (i <= 9)  return 'low';
+  if (i <= 19) return 'mid';
+  return 'high';
+}
+
+// Max count per rune (across ALL runewords) — used for bar scaling
+const RUNE_MAX = {};
+
+const RUNEWORDS = [
+  { name: "Ancient's Pledge", runes: ['Ral','Ort','Tal'] },
+  { name: "Authority",        runes: ['Hel','Shael','Ral'],                    tags: ['rotw'] },
+  { name: "Beast",            runes: ['Ber','Tir','Um','Mal','Lum'] },
+  { name: "Black",            runes: ['Thul','Io','Nef'] },
+  { name: "Bone",             runes: ['Sol','Um','Um'] },
+  { name: "Bramble",          runes: ['Ral','Ohm','Sur','Eth'] },
+  { name: "Brand",            runes: ['Jah','Lo','Mal','Gul'] },
+  { name: "Breath of the Dying", runes: ['Vex','Hel','El','Eld','Zod','Eth'] },
+  { name: "Bulwark",          runes: ['Shael','Io','Sol'],                      tags: ['ldr'] },
+  { name: "Call to Arms",     runes: ['Amn','Ral','Mal','Ist','Ohm'] },
+  { name: "Chains of Honor",  runes: ['Dol','Um','Ber','Ist'] },
+  { name: "Chaos",            runes: ['Fal','Ohm','Um'] },
+  { name: "Coven",            runes: ['Ist','Ral','Io'],                        tags: ['rotw'] },
+  { name: "Crescent Moon",    runes: ['Shael','Um','Tir'] },
+  { name: "Cure",             runes: ['Shael','Io','Tal'],                      tags: ['ldr'] },
+  { name: "Death",            runes: ['Hel','El','Vex','Ort','Gul'] },
+  { name: "Delirium",         runes: ['Lem','Ist','Io'] },
+  { name: "Destruction",      runes: ['Vex','Lo','Ber','Jah','Ko'] },
+  { name: "Doom",             runes: ['Hel','Ohm','Um','Lo','Cham'] },
+  { name: "Dragon",           runes: ['Sur','Lo','Sol'] },
+  { name: "Dream",            runes: ['Io','Jah','Pul'] },
+  { name: "Duress",           runes: ['Shael','Um','Thul'] },
+  { name: "Edge",             runes: ['Tir','Tal','Amn'] },
+  { name: "Enigma",           runes: ['Jah','Ith','Ber'] },
+  { name: "Enlightenment",    runes: ['Pul','Ral','Sol'] },
+  { name: "Eternity",         runes: ['Amn','Ber','Ist','Sol','Sur'] },
+  { name: "Exile",            runes: ['Vex','Ohm','Ist','Dol'] },
+  { name: "Faith",            runes: ['Ohm','Jah','Lem','Eld'] },
+  { name: "Famine",           runes: ['Fal','Ohm','Ort','Jah'] },
+  { name: "Flickering Flame", runes: ['Nef','Pul','Vex'] },
+  { name: "Fortitude",        runes: ['El','Sol','Dol','Lo'] },
+  { name: "Fury",             runes: ['Jah','Gul','Eth'] },
+  { name: "Gloom",            runes: ['Fal','Um','Pul'] },
+  { name: "Grief",            runes: ['Eth','Tir','Lo','Mal','Ral'] },
+  { name: "Ground",           runes: ['Shael','Io','Ort'],                      tags: ['ldr'] },
+  { name: "Hand of Justice",  runes: ['Sur','Cham','Amn','Lo'] },
+  { name: "Harmony",          runes: ['Tir','Ith','Sol','Ko'] },
+  { name: "Hearth",           runes: ['Shael','Io','Thul'],                     tags: ['ldr'] },
+  { name: "Heart of the Oak", runes: ['Ko','Vex','Pul','Thul'] },
+  { name: "Holy Thunder",     runes: ['Eth','Ral','Ort','Tal'] },
+  { name: "Honor",            runes: ['Amn','El','Ith','Tir','Sol'] },
+  { name: "Hysteria",         runes: ['Shael','Ko','Eld'],                      tags: ['ldr'] },
+  { name: "Ice",              runes: ['Amn','Shael','Jah','Lo'] },
+  { name: "Infinity",         runes: ['Ber','Mal','Ber','Ist'] },
+  { name: "Insight",          runes: ['Ral','Tir','Tal','Sol'] },
+  { name: "King's Grace",     runes: ['Amn','Ral','Thul'] },
+  { name: "Kingslayer",       runes: ['Mal','Um','Gul','Fal'] },
+  { name: "Last Wish",        runes: ['Jah','Mal','Jah','Sur','Jah','Ber'] },
+  { name: "Lawbringer",       runes: ['Amn','Lem','Ko'] },
+  { name: "Leaf",             runes: ['Tir','Ral'] },
+  { name: "Lionheart",        runes: ['Hel','Lum','Fal'] },
+  { name: "Lore",             runes: ['Ort','Sol'] },
+  { name: "Malice",           runes: ['Ith','El','Eth'] },
+  { name: "Mania",            runes: ['Shael','Ko','Eld'],                      tags: ['ldr'] },
+  { name: "Melody",           runes: ['Shael','Ko','Nef'] },
+  { name: "Memory",           runes: ['Lum','Io','Sol','Eth'] },
+  { name: "Metamorphosis",    runes: ['Io','Cham','Fal'],                       tags: ['ldr'] },
+  { name: "Mist",             runes: ['Cham','Shael','Gul','Thul','Ith'] },
+  { name: "Mosaic",           runes: ['Mal','Gul','Amn'],                       tags: ['ldr'] },
+  { name: "Myth",             runes: ['Hel','Amn','Nef'] },
+  { name: "Nadir",            runes: ['Nef','Tir'] },
+  { name: "Oath",             runes: ['Shael','Pul','Mal','Lum'] },
+  { name: "Obedience",        runes: ['Hel','Ko','Thul','Eth','Fal'] },
+  { name: "Obsession",        runes: ['Zod','Ist','Lem','Lum','Io','Nef'] },
+  { name: "Passion",          runes: ['Dol','Ort','Eld','Lem'] },
+  { name: "Pattern",          runes: ['Tal','Ort','Thul'] },
+  { name: "Peace",            runes: ['Shael','Thul','Amn'] },
+  { name: "Phoenix",          runes: ['Vex','Vex','Lo','Jah'] },
+  { name: "Plague",           runes: ['Cham','Shael','Um'] },
+  { name: "Pride",            runes: ['Cham','Sur','Io','Lo'] },
+  { name: "Principle",        runes: ['Ral','Gul','Eld'] },
+  { name: "Prudence",         runes: ['Mal','Tir'] },
+  { name: "Radiance",         runes: ['Nef','Sol','Ith'] },
+  { name: "Rain",             runes: ['Ort','Mal','Ith'] },
+  { name: "Rhyme",            runes: ['Shael','Eth'] },
+  { name: "Rift",             runes: ['Hel','Ko','Lem','Gul'] },
+  { name: "Ritual",           runes: ['Amn','Shael','Ohm'],                     tags: ['rotw'] },
+  { name: "Sanctuary",        runes: ['Ko','Ko','Mal'] },
+  { name: "Silence",          runes: ['Dol','Eld','Hel','Ist','Tir','Vex'] },
+  { name: "Smoke",            runes: ['Nef','Lum'] },
+  { name: "Spirit",           runes: ['Tal','Thul','Ort','Amn'] },
+  { name: "Splendor",         runes: ['Eth','Lum'] },
+  { name: "Steel",            runes: ['Tir','El'] },
+  { name: "Stone",            runes: ['Shael','Um','Pul','Lum'] },
+  { name: "Strength",         runes: ['Amn','Tir'] },
+  { name: "Temper",           runes: ['Shael','Io','Ral'],                      tags: ['ldr'] },
+  { name: "Treachery",        runes: ['Shael','Thul','Lem'] },
+  { name: "Unbending Will",   runes: ['Fal','Io','Ith','Eld','El','Hel'] },
+  { name: "Venom",            runes: ['Tal','Dol','Mal'] },
+  { name: "Vigilance",        runes: ['Dol','Gul'],                             tags: ['rotw'] },
+  { name: "Void",             runes: ['Thul','Zod','Ist'],                      tags: ['rotw'] },
+  { name: "Voice of Reason",  runes: ['Lem','Ko','El','Eld'] },
+  { name: "Wealth",           runes: ['Lem','Ko','Tir'] },
+  { name: "White",            runes: ['Dol','Io'] },
+  { name: "Wind",             runes: ['Sur','El'] },
+  { name: "Wisdom",           runes: ['Pul','Ith','Eld'] },
+  { name: "Wrath",            runes: ['Pul','Lum','Ber','Mal'] },
+  { name: "Zephyr",           runes: ['Ort','Eth'] },
+];
+
+// normalise: ensure every entry has a tags array
+RUNEWORDS.forEach(rw => { if (!rw.tags) rw.tags = []; });
+
+// pre-compute max per rune for bar scaling
+RUNE_ORDER.forEach(r => {
+  RUNE_MAX[r] = RUNEWORDS.reduce((sum, rw) => sum + rw.runes.filter(x => x === r).length, 0);
+});
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+const STORAGE_KEY = 'd2r_tracker_v1';
+
+function loadDone() {
+  try { return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []); }
+  catch { return new Set(); }
+}
+
+function saveDone(set) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...set]));
+}
+
+let done = loadDone();
+let activeFilter = 'all';
+let searchQuery  = '';
+
+// ── Render ────────────────────────────────────────────────────────────────────
+
+function renderList() {
+  const container = document.getElementById('rwList');
+  container.innerHTML = '';
+
+  const q = searchQuery.toLowerCase();
+
+  RUNEWORDS.forEach(rw => {
+    const isDone = done.has(rw.name);
+
+    // filter logic
+    let visible = true;
+    if (activeFilter === 'todo'  && isDone)                    visible = false;
+    if (activeFilter === 'done'  && !isDone)                   visible = false;
+    if (activeFilter === 'ldr'   && !rw.tags.includes('ldr'))  visible = false;
+    if (activeFilter === 'rotw'  && !rw.tags.includes('rotw')) visible = false;
+    if (q && !rw.name.toLowerCase().includes(q))               visible = false;
+
+    const item = document.createElement('div');
+    item.className = 'rw-item' + (isDone ? ' done' : '') + (!visible ? ' hidden' : '');
+    item.dataset.name = rw.name;
+
+    // checkbox
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'rw-check';
+    cb.checked = isDone;
+    cb.addEventListener('change', e => { e.stopPropagation(); toggle(rw.name); });
+
+    // info block
+    const info = document.createElement('div');
+    info.className = 'rw-info';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'rw-name';
+    nameEl.textContent = rw.name;
+
+    const recipe = document.createElement('div');
+    recipe.className = 'rw-recipe';
+    rw.runes.forEach((r, i) => {
+      if (i > 0) {
+        const sep = document.createElement('span');
+        sep.className = 'plus-sep';
+        sep.textContent = '+';
+        recipe.appendChild(sep);
+      }
+      const chip = document.createElement('span');
+      chip.className = `rune-chip ${runeTier(r)}`;
+      chip.textContent = r;
+      recipe.appendChild(chip);
+    });
+
+    info.appendChild(nameEl);
+    info.appendChild(recipe);
+
+    // tags
+    const tags = document.createElement('div');
+    tags.className = 'rw-tags';
+    rw.tags.forEach(t => {
+      const tag = document.createElement('span');
+      tag.className = `tag ${t}`;
+      tag.textContent = t.toUpperCase();
+      tags.appendChild(tag);
+    });
+
+    item.appendChild(cb);
+    item.appendChild(info);
+    item.appendChild(tags);
+
+    // clicking the whole row also toggles
+    item.addEventListener('click', e => {
+      if (e.target === cb) return;
+      toggle(rw.name);
+    });
+
+    container.appendChild(item);
+  });
+}
+
+function renderProgress() {
+  const total = RUNEWORDS.length;
+  const n     = RUNEWORDS.filter(rw => done.has(rw.name)).length;
+  const pct   = total ? (n / total * 100).toFixed(1) : 0;
+  document.getElementById('progressLabel').textContent = `${n} / ${total} completed  (${pct}%)`;
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+
+function renderRunes() {
+  // tally only remaining runewords
+  const remaining = RUNEWORDS.filter(rw => !done.has(rw.name));
+  const tally = {};
+  RUNE_ORDER.forEach(r => tally[r] = 0);
+  remaining.forEach(rw => rw.runes.forEach(r => tally[r]++));
+
+  const table = document.getElementById('runeTable');
+  table.innerHTML = '';
+
+  // tier separators
+  const tierLabels = { 10: 'Mid Runes', 20: 'High Runes' };
+
+  RUNE_ORDER.forEach((rune, idx) => {
+    if (tierLabels[idx]) {
+      const sepRow = document.createElement('tr');
+      sepRow.innerHTML = `<td colspan="3" style="padding:6px 4px 2px; font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; border-top:1px solid var(--border);">${tierLabels[idx]}</td>`;
+      table.appendChild(sepRow);
+    }
+
+    const count = tally[rune];
+    const tier  = runeTier(rune);
+    const max   = RUNE_MAX[rune];
+    const pct   = max ? (count / max * 100) : 0;
+
+    const tr = document.createElement('tr');
+    if (count === 0) tr.classList.add('zero');
+
+    tr.innerHTML = `
+      <td class="rune-name ${tier}">${rune}</td>
+      <td class="rune-count">${count}</td>
+      <td class="rune-bar-cell">
+        <div class="rune-bar-bg">
+          <div class="rune-bar-fill ${tier}" style="width:${pct}%"></div>
+        </div>
+      </td>`;
+
+    table.appendChild(tr);
+  });
+}
+
+function render() {
+  renderList();
+  renderProgress();
+  renderRunes();
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+
+function toggle(name) {
+  if (done.has(name)) done.delete(name);
+  else done.add(name);
+  saveDone(done);
+  render();
+}
+
+function resetAll() {
+  if (!confirm('Reset all progress? This cannot be undone.')) return;
+  done.clear();
+  saveDone(done);
+  render();
+}
+
+// ── Filter buttons ────────────────────────────────────────────────────────────
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.filter;
+    renderList();
+  });
+});
+
+document.getElementById('searchInput').addEventListener('input', e => {
+  searchQuery = e.target.value;
+  renderList();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
